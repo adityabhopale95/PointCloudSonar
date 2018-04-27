@@ -60,7 +60,7 @@ int main(int argc, char *argv[]){
             i2c_smbus_read_byte_data(i2c_file, Y_GYRO_ADD_L);
   gyro_z = i2c_smbus_read_byte_data(i2c_file, Z_GYRO_ADD_H) << 8 |
             i2c_smbus_read_byte_data(i2c_file, Z_GYRO_ADD_L);
-  
+
   set_mag_registers(i2c_file);
 
   mag_x = i2c_smbus_read_byte_data(i2c_file, X_MAG_ADD_H) << 8 |
@@ -70,8 +70,8 @@ int main(int argc, char *argv[]){
   mag_z = i2c_smbus_read_byte_data(i2c_file, Z_MAG_ADD_H) << 8 |
             i2c_smbus_read_byte_data(i2c_file, Z_MAG_ADD_L);
 
-//  while(1){
-/*    initialize_i2c(i2c_file,address);
+/*  while(1){
+    initialize_i2c(i2c_file,address);
 
     accel_x = i2c_smbus_read_byte_data(i2c_file, X_ACC_ADD_H) << 8 |
               i2c_smbus_read_byte_data(i2c_file, X_ACC_ADD_L);
@@ -87,15 +87,33 @@ int main(int argc, char *argv[]){
     gyro_z = i2c_smbus_read_byte_data(i2c_file, Z_GYRO_ADD_H) << 8 |
               i2c_smbus_read_byte_data(i2c_file, Z_GYRO_ADD_L);
 
-    set_mag_registers(i2c_file);
+//    set_mag_registers(i2c_file);
 
+    write_i2c(i2c_file, 0x37, 0x22);
+
+    snprintf(filen,19,"/dev/i2c-2", adapter_nr);
+
+    i2c_file = open(filen, O_RDWR);
+    if(i2c_file < 0){
+      perror("Unable to open I2C control file\n");
+      exit(1);
+    }
+
+    initialize_i2c(i2c_file, MAG_ASTC);
+    sleep(0.1);
+    write_i2c(i2c_file, MAG_CNTL2, 0x01);
+    write_i2c(i2c_file, MAG_CNTL2, 0x00);
+    write_i2c(i2c_file, MAG_CNTL1, 0x1f);
+    write_i2c(i2c_file, MAG_CNTL1, 0x10);
+    write_i2c(i2c_file, MAG_CNTL1, 0x12);
+    sleep(0.1);
     mag_x = i2c_smbus_read_byte_data(i2c_file, X_MAG_ADD_H) << 8 |
               i2c_smbus_read_byte_data(i2c_file, X_MAG_ADD_L);
     mag_y = i2c_smbus_read_byte_data(i2c_file, Y_MAG_ADD_H) << 8 |
               i2c_smbus_read_byte_data(i2c_file, Y_MAG_ADD_L);
     mag_z = i2c_smbus_read_byte_data(i2c_file, Z_MAG_ADD_H) << 8 |
-              i2c_smbus_read_byte_data(i2c_file, Z_MAG_ADD_L);
-*/
+              i2c_smbus_read_byte_data(i2c_file, Z_MAG_ADD_L);*/
+
     printf("accel_x: %d accel_y: %d accel_z: %d\n", int(accel_x), int(accel_y), int(accel_z));
     printf("gyro_x: %d gyro_y: %d gyro_z: %d\n", int(gyro_x), int(gyro_y), int(gyro_z));
     printf("mag_x: %d mag_y: %d mag_z: %d\n\n", int(mag_x), int(mag_y), int(mag_z));
