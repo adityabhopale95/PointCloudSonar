@@ -58,8 +58,8 @@
 #define MAG_STATUS1 0x02
 #define MAG_STATUS2 0x09
 
-#define sampleFreq	512.0f		// sample frequency in Hz
-#define betaDef		0.1f		// 2 * proportional gain
+#define sampleFreq	100.0f		// sample frequency in Hz
+#define betaDef		2.0f		// 2 * proportional gain
 
 int i2c_file;
 float Ares = 2.0/32768.0;
@@ -86,6 +86,10 @@ void initialize_mpu();
 void initialize_mag(float *destination);
 
 void read_data_mag(int16_t *destination);
+
+void read_data_acc(int16_t *destination);
+
+void read_data_gyro(int16_t *destination);
 
 float invSqrtOpt(float x);
 

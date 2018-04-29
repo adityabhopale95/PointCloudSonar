@@ -20,10 +20,10 @@ void initialize_i2c(int address){
     exit(1);
   }
 
-  printf("i2c file: %d\n", i2c_file);
+//  printf("i2c file: %d\n", i2c_file);
 
   int successful = ioctl(i2c_file, I2C_SLAVE, address);
-  printf("Success: %d\n", successful);
+//  printf("Success: %d\n", successful);
   if(i2c_file < 0){
     printf("Error: IMU I2C Failed\n");
   }
@@ -39,6 +39,8 @@ int main(int argc, char *argv[]){
   uint8_t status;
   int16_t accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z, mag_x, mag_y, mag_z;
   int16_t mag_count[3];
+  int16_t acc_count[3];
+  int16_t gyro_count[3];
   address = DEV_ADD;
 
   initialize_mpu();
@@ -48,21 +50,17 @@ int main(int argc, char *argv[]){
   while(1){
     initialize_i2c(DEV_ADD);
     status = i2c_smbus_read_byte_data(i2c_file, INT_STATUS);
-    printf("Status: %d\n", status);
+//    printf("Status: %d\n", status);
     if(status & 0x01){
-      accel_x = (i2c_smbus_read_byte_data(i2c_file, X_ACC_ADD_H) << 8 |
-                i2c_smbus_read_byte_data(i2c_file, X_ACC_ADD_L)) * Ares;
-      accel_y = (i2c_smbus_read_byte_data(i2c_file, Y_ACC_ADD_H) << 8 |
-                i2c_smbus_read_byte_data(i2c_file, Y_ACC_ADD_L)) * Ares;
-      accel_z = (i2c_smbus_read_byte_data(i2c_file, Z_ACC_ADD_H) << 8 |
-                i2c_smbus_read_byte_data(i2c_file, Z_ACC_ADD_L)) * Ares;
+      read_data_acc(acc_count);
+      accel_x = (float)(acc_count[0]) * Ares;
+      accel_y = (float)(acc_count[1]) * Ares;
+      accel_z = (float)(acc_count[2]) * Ares;
 
-      gyro_x = (i2c_smbus_read_byte_data(i2c_file, X_GYRO_ADD_H) << 8 |
-                i2c_smbus_read_byte_data(i2c_file, X_GYRO_ADD_L)) * Gres;
-      gyro_y = (i2c_smbus_read_byte_data(i2c_file, Y_GYRO_ADD_H) << 8 |
-                i2c_smbus_read_byte_data(i2c_file, Y_GYRO_ADD_L)) * Gres;
-      gyro_z = (i2c_smbus_read_byte_data(i2c_file, Z_GYRO_ADD_H) << 8 |
-                i2c_smbus_read_byte_data(i2c_file, Z_GYRO_ADD_L)) * Gres;
+      read_data_gyro(gyro_count);
+      gyro_x = (float)(gyro_count[0]) * Gres;
+      gyro_y = (float)(gyro_count[1]) * Gres;
+      gyro_z = (float)(gyro_count[2]) * Gres;
 
       initialize_i2c(MAG_ASTC);
       read_data_mag(mag_count);
@@ -75,18 +73,20 @@ int main(int argc, char *argv[]){
       mag_z = (float(mag_count[2]) * Mres * mag_Calib[2]) - mag_bias[2];
     }
 
-    MadgwickAHRSupdateOpt((gyro_x*(PI/180)), (gyro_y*(PI/180)), (gyro_x*(PI/180)), accel_x, accel_y, accel_z, mag_x, mag_y, mag_z);
+    MadgwickAHRSupdateOpt((gyro_x*(PI/180)), (gyro_y*(PI/180)), (gyro_x*(PI/180)), accel_x, accel_y, accel_z, 0.0, 0.0, 0.0);
     toEulerianAngle(q0, q1, q2, q3);
     toEulerAngle(q0, q1, q2, q3);
-    printf("accel_x: %d accel_y: %d accel_z: %d\n", int(accel_x), int(accel_y), int(accel_z));
-    printf("gyro_x: %d gyro_y: %d gyro_z: %d\n", int(gyro_x), int(gyro_y), int(gyro_z));
+    printf("accel_x: %d accel_y: %d accel_z: %d\n", (int16_t)accel_x, (int16_t)accel_y, (int16_t)accel_z);
+    printf("gyro_x: %d gyro_y: %d gyro_z: %d\n", (int16_t)gyro_x, (int16_t)gyro_y, (int16_t)gyro_z);
     printf("mag_x: %d mag_y: %d mag_z: %d\n", int(mag_x), int(mag_y), int(mag_z));
-    printf("quarternion q0,q1,q2,q3: %f, %f, %f, %f \n\n", q0,q1,q2,q3);
+    printf("q0: %f, q1: %f,q2: %f,q3: %f\n\n", q0,q1,q2,q3);
     printf("roll: %d pitch: %d yaw: %d\n\n", int(roll), int(pitch), int(yaw));
     q0 = 1.0f;
     q1 = 0.0f;
     q2 = 0.0f;
     q3 = 0.0f;
+
+    sleep(0.01);
   }
 }
 
@@ -99,7 +99,7 @@ void initialize_mpu(){
   sleep(0.2);
 
   write_i2c(CONFIG_MPU, 0x03);
-  write_i2c(CONFIG_MPU, 0x04);
+  write_i2c(DIV_SMPLR, 0x04);
 
   uint8_t c = i2c_smbus_read_byte_data(i2c_file, GYRO_CONFIG);
   c = c & ~0x03;
@@ -132,15 +132,43 @@ void initialize_mag(float * destination){
   rawData[1] = i2c_smbus_read_byte_data(i2c_file, MAG_SENSE_Y);
   rawData[2] = i2c_smbus_read_byte_data(i2c_file, MAG_SENSE_Z);
 
-  destination[0] = (float(rawData[0]-128) / 256.0) + 1.0;
-  destination[1] = (float(rawData[1]-128) / 256.0) + 1.0;
-  destination[2] = (float(rawData[2]-128) / 256.0) + 1.0;
+  destination[0] = (((float)rawData[0]-128.0) / 256.0) + 1.0;
+  destination[1] = (((float)rawData[1]-128.0) / 256.0) + 1.0;
+  destination[2] = (((float)rawData[2]-128.0) / 256.0) + 1.0;
 
   write_i2c(MAG_CNTL1, 0x00);
   sleep(0.01);
 
   write_i2c(MAG_CNTL1, 0x12);
   sleep(0.01);
+}
+
+void read_data_acc(int16_t *destination){
+  uint8_t rawData[6];
+  rawData[0] = i2c_smbus_read_byte_data(i2c_file, X_ACC_ADD_H);
+  rawData[1] = i2c_smbus_read_byte_data(i2c_file, X_ACC_ADD_L);
+  rawData[2] = i2c_smbus_read_byte_data(i2c_file, Y_ACC_ADD_H);
+  rawData[3] = i2c_smbus_read_byte_data(i2c_file, Y_ACC_ADD_L);
+  rawData[4] = i2c_smbus_read_byte_data(i2c_file, Z_ACC_ADD_H);
+  rawData[5] = i2c_smbus_read_byte_data(i2c_file, Z_ACC_ADD_L);
+
+  destination[0] = (int16_t)(rawData[0]) << 8 | rawData[1];
+  destination[1] = (int16_t)(rawData[2]) << 8 | rawData[3];
+  destination[2] = (int16_t)(rawData[4]) << 8 | rawData[5];
+}
+
+void read_data_gyro(int16_t *destination){
+  uint8_t rawData[6];
+  rawData[0] = i2c_smbus_read_byte_data(i2c_file, X_GYRO_ADD_H);
+  rawData[1] = i2c_smbus_read_byte_data(i2c_file, X_GYRO_ADD_L);
+  rawData[2] = i2c_smbus_read_byte_data(i2c_file, Y_GYRO_ADD_H);
+  rawData[3] = i2c_smbus_read_byte_data(i2c_file, Y_GYRO_ADD_L);
+  rawData[4] = i2c_smbus_read_byte_data(i2c_file, Z_GYRO_ADD_H);
+  rawData[5] = i2c_smbus_read_byte_data(i2c_file, Z_GYRO_ADD_L);
+
+  destination[0] = (int16_t)rawData[0] << 8 | rawData[1];
+  destination[1] = (int16_t)rawData[2] << 8 | rawData[3];
+  destination[2] = (int16_t)rawData[4] << 8 | rawData[5];
 }
 
 void read_data_mag(int16_t *destination){
@@ -158,9 +186,9 @@ void read_data_mag(int16_t *destination){
 
     status2 = i2c_smbus_read_byte_data(i2c_file, MAG_STATUS2);
     if(!(status2 & 0x08)){
-      destination[0] = (int16_t(rawData[1]) << 8) | rawData[0];
-      destination[1] = (int16_t(rawData[3]) << 8) | rawData[2];
-      destination[2] = (int16_t(rawData[5]) << 8) | rawData[4];
+      destination[0] = (int16_t)(rawData[1]) << 8 | rawData[0];
+      destination[1] = (int16_t)(rawData[3]) << 8 | rawData[2];
+      destination[2] = (int16_t)(rawData[5]) << 8 | rawData[4];
     }
   }
 }
@@ -175,10 +203,10 @@ void MadgwickAHRSupdateOpt(float gx, float gy, float gz, float ax, float ay, flo
 	float reci_sample = (1.0f / sampleFreq);
 
 	// Use IMU algorithm if magnetometer measurement invalid (avoids NaN in magnetometer normalisation)
-	/*if((mx == 0.0f) && (my == 0.0f) && (mz == 0.0f)) {
+	if((mx == 0.0f) && (my == 0.0f) && (mz == 0.0f)) {
 		MadgwickAHRSupdateIMUOpt(gx, gy, gz, ax, ay, az);
 		return;
-	}*/
+	}
 
 	// Rate of change of quaternion from gyroscope
 	qDot1 = 0.5f * (-q1 * gx - q2 * gy - q3 * gz);
