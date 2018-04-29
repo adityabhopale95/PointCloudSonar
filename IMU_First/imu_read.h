@@ -31,39 +31,46 @@
 #define Y_MAG_ADD_L 0x05
 #define Z_MAG_ADD_L 0x07
 
+#define GYRO_CONFIG 0x1B
+#define ACCEL_CONFIG 0x1C
+#define ACCEL_CONFIG2 0x1D
+
+#define DIV_SMPLR 0x19
+
+#define CONFIG_MPU 0x1A
 #define MPU_POWER1 0x6b
 #define MPU_POWER2 0x6c
 
 #define INT_PIN_CONF 0x37
+#define INT_ENABLE 0x38
+#define INT_STATUS 0x3A
 
-int MAG_CNTL1 = 0x0a;
-int MAG_CNTL2 = 0x0b;
-int MAG_ASTC = 0x0c;
+#define MAG_CNTL1 0x0a
+#define MAG_CNTL2 0x0b
+#define MAG_ASTC 0x0c
+
+#define MAG_SENSE_X 0x10
+#define MAG_SENSE_Y 0x11
+#define MAG_SENSE_Z 0x12
+
+#define MAG_STATUS1 0x02
+#define MAG_STATUS2 0x09
+
+int i2c_file;
+float Ares = 2.0/32768.0;
+float Gres = 250.0/32768.0;
+float Mres = (10.0*4912.0)/32760.0;
+float mag_Calib[3] = {0,0,0};
+float mag_bias[3] = {0,0,0};
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
-void initialize_i2c(int fd,int address);
+void initialize_i2c(int address);
 
-void write_i2c(int fd, uint8_t reg_add, uint8_t value);
+void write_i2c(uint8_t reg_add, uint8_t value);
 
-void set_mag_registers(int fd){
-  int adapter_nr = 0;
-  char filen[20];
-  snprintf(filen,19,"/dev/i2c-2", adapter_nr);
+void initialize_mpu();
 
-  write_i2c(fd, 0x37, 0x22);
+void initialize_mag(float *destination);
 
-  fd = open(filen, O_RDWR);
-  if(fd < 0){
-    perror("Unable to open I2C control file\n");
-    exit(1);
-  }
-  initialize_i2c(fd, MAG_ASTC);
-  sleep(0.1);
-  write_i2c(fd, MAG_CNTL2, 0x01);
-  write_i2c(fd, MAG_CNTL2, 0x00);
-  write_i2c(fd, MAG_CNTL1, 0x1f);
-  write_i2c(fd, MAG_CNTL1, 0x10);
-  write_i2c(fd, MAG_CNTL1, 0x12);
-  sleep(0.1);
-}
+void read_data_mag(int16_t *destination);
