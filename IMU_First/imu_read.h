@@ -8,6 +8,8 @@
 #include <math.h>
 #include <stdint.h>
 
+#define PI 3.141592654
+
 #define DEV_ADD 0x68
 
 #define X_ACC_ADD_H 0x3b
@@ -56,6 +58,9 @@
 #define MAG_STATUS1 0x02
 #define MAG_STATUS2 0x09
 
+#define sampleFreq	512.0f		// sample frequency in Hz
+#define betaDef		0.1f		// 2 * proportional gain
+
 int i2c_file;
 float Ares = 2.0/32768.0;
 float Gres = 250.0/32768.0;
@@ -63,14 +68,29 @@ float Mres = (10.0*4912.0)/32760.0;
 float mag_Calib[3] = {0,0,0};
 float mag_bias[3] = {0,0,0};
 
+volatile float beta = betaDef;				// algorithm gain
+volatile float q0=1.0f, q1=0.0f, q2=0.0f, q3=0.0f;	// quaternion of sensor frame relative to auxiliary frame
+volatile float roll,pitch, yaw;
+volatile float roll1, pitch1, yaw1;
+
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
 void initialize_i2c(int address);
 
 void write_i2c(uint8_t reg_add, uint8_t value);
 
+void MadgwickAHRSupdateOpt(float gx, float gy, float gz, float ax, float ay, float az, float mx, float my, float mz);
+
 void initialize_mpu();
 
 void initialize_mag(float *destination);
 
 void read_data_mag(int16_t *destination);
+
+float invSqrtOpt(float x);
+
+void MadgwickAHRSupdateIMUOpt(float gx, float gy, float gz, float ax, float ay, float az);
+
+void toEulerAngle(float q0, float q1, float q2, float q3);
+
+void toEulerianAngle(float q0,float q1,float q2, float q3);
