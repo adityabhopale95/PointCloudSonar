@@ -59,7 +59,7 @@
 #define MAG_STATUS2 0x09
 
 #define sampleFreq	100.0f		// sample frequency in Hz
-#define betaDef		2.0f		// 2 * proportional gain
+#define betaDef	1.5f		// 2 * proportional gain
 
 int i2c_file;
 float Ares = 2.0/32768.0;
@@ -68,6 +68,7 @@ float Mres = (10.0*4912.0)/32760.0;
 float mag_Calib[3] = {0,0,0};
 float mag_bias[3] = {0,0,0};
 
+const float r = 100.0;
 volatile float beta = betaDef;				// algorithm gain
 volatile float q0=1.0f, q1=0.0f, q2=0.0f, q3=0.0f;	// quaternion of sensor frame relative to auxiliary frame
 volatile float roll,pitch, yaw;

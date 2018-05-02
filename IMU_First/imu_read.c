@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <math.h>
 #include <stdint.h>
+#include <string.h>
 
 void initialize_i2c(int address){
   int adapter_nr = 0;
@@ -37,12 +38,16 @@ void write_i2c(uint8_t reg_add, uint8_t value){
 int main(int argc, char *argv[]){
   int address;
   uint8_t status;
-  int16_t accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z, mag_x, mag_y, mag_z;
+  float accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z, mag_x, mag_y, mag_z;
   int16_t mag_count[3];
   int16_t acc_count[3];
   int16_t gyro_count[3];
   address = DEV_ADD;
-
+  FILE *fp_wr;
+  char *fp_name = "a";
+  float x_out,y_out,z_out;
+  //fp_name = strcat(fp_name,".csv");
+  fp_wr = fopen(fp_name,"w+");
   initialize_mpu();
 
   initialize_mag(mag_Calib);
@@ -73,20 +78,24 @@ int main(int argc, char *argv[]){
       mag_z = (float(mag_count[2]) * Mres * mag_Calib[2]) - mag_bias[2];
     }
 
-    MadgwickAHRSupdateOpt((gyro_x*(PI/180)), (gyro_y*(PI/180)), (gyro_x*(PI/180)), accel_x, accel_y, accel_z, 0.0, 0.0, 0.0);
-    toEulerianAngle(q0, q1, q2, q3);
+    MadgwickAHRSupdateIMUOpt((gyro_x*(PI/180)), (gyro_y*(PI/180)), (gyro_z*(PI/180)), accel_x, accel_y, accel_z);
+    //toEulerianAngle(q0, q1, q2, q3);
     toEulerAngle(q0, q1, q2, q3);
-    printf("accel_x: %d accel_y: %d accel_z: %d\n", (int16_t)accel_x, (int16_t)accel_y, (int16_t)accel_z);
-    printf("gyro_x: %d gyro_y: %d gyro_z: %d\n", (int16_t)gyro_x, (int16_t)gyro_y, (int16_t)gyro_z);
-    printf("mag_x: %d mag_y: %d mag_z: %d\n", int(mag_x), int(mag_y), int(mag_z));
-    printf("q0: %f, q1: %f,q2: %f,q3: %f\n\n", q0,q1,q2,q3);
-    printf("roll: %d pitch: %d yaw: %d\n\n", int(roll), int(pitch), int(yaw));
-    q0 = 1.0f;
-    q1 = 0.0f;
-    q2 = 0.0f;
-    q3 = 0.0f;
 
-    sleep(0.01);
+    if(yaw < 0.0){
+      yaw = yaw + (2*PI);
+    }
+    x_out = r * sinf(pitch) * cosf(yaw);
+    y_out = r * sinf(pitch) * sinf(yaw);
+    z_out = r * cosf(yaw);
+
+    fprintf(fp_wr, "%f,%f,%f\n",x_out, y_out, z_out);
+    printf("accel_x: %f accel_y: %f accel_z: %f\n", accel_x, accel_y, accel_z);
+    printf("gyro_x: %f gyro_y: %f gyro_z: %f\n", gyro_x, gyro_y, gyro_z);
+    printf("mag_x: %f mag_y: %f mag_z: %f\n", mag_x, mag_y, mag_z);
+    printf("q0: %f, q1: %f,q2: %f,q3: %f\n", q0,q1,q2,q3);
+    printf("roll: %f pitch: %f yaw: %f\n\n", (roll*(180.0/PI)), (pitch*(180.0/PI)), (yaw*(180.0/PI)));
+    sleep(0.2);
   }
 }
 
@@ -152,9 +161,9 @@ void read_data_acc(int16_t *destination){
   rawData[4] = i2c_smbus_read_byte_data(i2c_file, Z_ACC_ADD_H);
   rawData[5] = i2c_smbus_read_byte_data(i2c_file, Z_ACC_ADD_L);
 
-  destination[0] = (int16_t)(rawData[0]) << 8 | rawData[1];
-  destination[1] = (int16_t)(rawData[2]) << 8 | rawData[3];
-  destination[2] = (int16_t)(rawData[4]) << 8 | rawData[5];
+  destination[0] = (int16_t)rawData[0] << 8 | rawData[1];
+  destination[1] = (int16_t)rawData[2] << 8 | rawData[3];
+  destination[2] = (int16_t)rawData[4] << 8 | rawData[5];
 }
 
 void read_data_gyro(int16_t *destination){
