@@ -8,7 +8,70 @@
 #include <sys/types.h>
 #include <math.h>
 #include <stdint.h>
+#include <termios.h>
 #include <string.h>
+
+void initialize_uart(){
+  char *port_name = "/dev/ttyUSB0";
+  uart_file = open(port_name, O_RDWR | O_NOCTTY);
+  printf("UART FILE: %d\n", uart_file);
+  if(uart_file < 0){
+    printf("Unable to open UART\n");
+    exit(1);
+  }
+
+  set_serial_attr(B4800,0);
+  set_serial_blocking(0);
+}
+
+int set_serial_attr(int speed, int parity){
+  struct termios tty;
+  memset(&tty, 0, sizeof tty);
+  if(tcgetattr(uart_file, &tty) != 0){
+    printf("Error in serial\n");
+    return -1;
+  }
+  cfsetospeed(&tty, speed);
+  cfsetispeed(&tty, speed);
+
+  tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;
+  tty.c_iflag &= ~IGNBRK;
+  tty.c_lflag = 0;
+
+  tty.c_oflag = 0;
+  tty.c_cc[VMIN]  = 0;
+  tty.c_cc[VTIME] = 5;
+
+  tty.c_iflag &= ~(IXON | IXOFF | IXANY); // shut off xon/xoff ctrl
+
+  tty.c_cflag |= (CLOCAL | CREAD);// ignore modem controls,
+                                       // enable reading
+  tty.c_cflag &= ~(PARENB | PARODD);      // shut off parity
+  tty.c_cflag |= parity;
+  tty.c_cflag &= ~CSTOPB;
+  tty.c_cflag &= ~CRTSCTS;
+
+  if (tcsetattr (uart_file, TCSANOW, &tty) != 0)
+   {
+     printf ("error from tcsetattr");
+     return -1;
+   }
+   return 0;
+}
+
+void set_serial_blocking(int if_block){
+  struct termios tty;
+  memset(&tty, 0, sizeof tty);
+  if (tcgetattr (uart_file, &tty) != 0){
+    printf("error frorm serial\n");
+  }
+
+  tty.c_cc[VMIN]  = if_block ? 1 : 0;
+  tty.c_cc[VTIME] = 5;
+
+  if (tcsetattr (uart_file, TCSANOW, &tty) != 0)
+    printf("Error in serial\n");
+}
 
 void initialize_i2c(int address){
   int adapter_nr = 0;
@@ -45,15 +108,19 @@ int main(int argc, char *argv[]){
   address = DEV_ADD;
   FILE *fp_wr;
   char *fp_name = "a";
-  float x_out,y_out,z_out;
+  int16_t x_out,y_out,z_out;
+  int sonar_in;
+  int buf[1];
   //fp_name = strcat(fp_name,".csv");
-  fp_wr = fopen(fp_name,"w+");
+  initialize_uart();
+
   initialize_mpu();
 
   initialize_mag(mag_Calib);
 
   while(1){
     initialize_i2c(DEV_ADD);
+    buf[0] = NULL;
     status = i2c_smbus_read_byte_data(i2c_file, INT_STATUS);
 //    printf("Status: %d\n", status);
     if(status & 0x01){
@@ -83,19 +150,35 @@ int main(int argc, char *argv[]){
     toEulerAngle(q0, q1, q2, q3);
 
     if(yaw < 0.0){
-      yaw = yaw + (2*PI);
+      yaw = yaw + (360.0f/6.0f);
     }
-    x_out = r * sinf(pitch) * cosf(yaw);
-    y_out = r * sinf(pitch) * sinf(yaw);
-    z_out = r * cosf(yaw);
 
-    fprintf(fp_wr, "%f,%f,%f\n",x_out, y_out, z_out);
+    yaw = yaw * 6.0f;
+
+    if(yaw > 360.0){
+      yaw = yaw - 360.0;
+    }
+
+    sonar_in = read(uart_file, buf, sizeof buf);
+    printf("Sonar values: %d\n", buf[0]);
+
+    x_out = ceil(r * cosf(pitch) * sinf((yaw*(PI/180))));
+    y_out = ceil(r * cosf(pitch) * cosf((yaw*(PI/180))));
+    z_out = ceil(r * sinf(pitch));
+
+    fp_wr = fopen(fp_name,"a");
+
+    fprintf(fp_wr, "%d,%d,%d\n", x_out, y_out, z_out);
+
+    fclose(fp_wr);
+
     printf("accel_x: %f accel_y: %f accel_z: %f\n", accel_x, accel_y, accel_z);
     printf("gyro_x: %f gyro_y: %f gyro_z: %f\n", gyro_x, gyro_y, gyro_z);
     printf("mag_x: %f mag_y: %f mag_z: %f\n", mag_x, mag_y, mag_z);
     printf("q0: %f, q1: %f,q2: %f,q3: %f\n", q0,q1,q2,q3);
-    printf("roll: %f pitch: %f yaw: %f\n\n", (roll*(180.0/PI)), (pitch*(180.0/PI)), (yaw*(180.0/PI)));
-    sleep(0.2);
+    printf("roll: %f pitch: %f yaw: %f\n\n", (roll*(180.0/PI)), (pitch*(180.0/PI)), (yaw));
+    printf("Xout: %d Yout: %d Zout: %d\n", x_out, y_out, z_out);
+    usleep(5000);
   }
 }
 
@@ -412,6 +495,7 @@ void toEulerAngle(float q0, float q1, float q2, float q3 )
 	float siny = 2.0 * (q0 * q3 + q1 * q2);
 	float cosy = 1.0 - 2.0 * (q2 * q2 + q3 * q3);
 	yaw = atan2f(siny, cosy);
+  yaw = yaw * (180/PI);
 }
 
 void toEulerianAngle(float q0,float q1,float q2, float q3)

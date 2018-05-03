@@ -62,6 +62,7 @@
 #define betaDef	1.5f		// 2 * proportional gain
 
 int i2c_file;
+int uart_file;
 float Ares = 2.0/32768.0;
 float Gres = 250.0/32768.0;
 float Mres = (10.0*4912.0)/32760.0;
@@ -99,3 +100,9 @@ void MadgwickAHRSupdateIMUOpt(float gx, float gy, float gz, float ax, float ay, 
 void toEulerAngle(float q0, float q1, float q2, float q3);
 
 void toEulerianAngle(float q0,float q1,float q2, float q3);
+
+void initialize_uart();
+
+void set_serial_blocking(int if_block);
+
+int set_serial_attr(int speed, int parity);
