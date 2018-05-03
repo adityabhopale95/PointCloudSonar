@@ -11,7 +11,7 @@ void setup()
   pinMode(echo,INPUT);
   pinMode(A0,INPUT);
   pinMode(trig,OUTPUT);
-  Serial.begin(9600);
+  Serial.begin(4800);
 }
 
 void loop()
@@ -24,11 +24,11 @@ void loop()
   digitalWrite(trig,LOW);
   
   duration = pulseIn(echo,HIGH);
-  val_read = analogRead(A0);
-  Serial.println("ADC Value: ");
-  Serial.println(val_read);
+//  val_read = analogRead(A0);
+//  Serial.println("ADC Value: ");
+//  Serial.println(val_read);
   distance = duration * 0.034/2;
-  Serial.print("Distance: ");
-  Serial.println(distance);  
-  delay(100);
+//  Serial.print("Distance: ");
+  Serial.write(distance);  
+  delay(50);
 }
