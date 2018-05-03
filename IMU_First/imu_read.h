@@ -61,6 +61,8 @@
 #define sampleFreq	100.0f		// sample frequency in Hz
 #define betaDef	1.5f		// 2 * proportional gain
 
+#define sonar_size 30
+
 int i2c_file;
 int uart_file;
 float Ares = 2.0/32768.0;
@@ -106,3 +108,5 @@ void initialize_uart();
 void set_serial_blocking(int if_block);
 
 int set_serial_attr(int speed, int parity);
+
+void extraction_uart(float *destination);

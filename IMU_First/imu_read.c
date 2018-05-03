@@ -12,7 +12,7 @@
 #include <string.h>
 
 void initialize_uart(){
-  char *port_name = "/dev/ttyUSB0";
+  char *port_name = "/dev/ttyUSB1";
   uart_file = open(port_name, O_RDWR | O_NOCTTY);
   printf("UART FILE: %d\n", uart_file);
   if(uart_file < 0){
@@ -63,7 +63,7 @@ void set_serial_blocking(int if_block){
   struct termios tty;
   memset(&tty, 0, sizeof tty);
   if (tcgetattr (uart_file, &tty) != 0){
-    printf("error frorm serial\n");
+    printf("error from serial\n");
   }
 
   tty.c_cc[VMIN]  = if_block ? 1 : 0;
@@ -109,8 +109,8 @@ int main(int argc, char *argv[]){
   FILE *fp_wr;
   char *fp_name = "a";
   int16_t x_out,y_out,z_out;
-  int sonar_in;
-  int buf[1];
+  float sonar_val;
+
   //fp_name = strcat(fp_name,".csv");
   initialize_uart();
 
@@ -120,7 +120,6 @@ int main(int argc, char *argv[]){
 
   while(1){
     initialize_i2c(DEV_ADD);
-    buf[0] = NULL;
     status = i2c_smbus_read_byte_data(i2c_file, INT_STATUS);
 //    printf("Status: %d\n", status);
     if(status & 0x01){
@@ -159,8 +158,13 @@ int main(int argc, char *argv[]){
       yaw = yaw - 360.0;
     }
 
-    sonar_in = read(uart_file, buf, sizeof buf);
-    printf("Sonar values: %d\n", buf[0]);
+    extraction_uart(&sonar_val);
+
+
+//    sonar_val_in = atof(buf);
+
+    printf("Buff: %f\n", sonar_val);
+//    printf("Sonar values: %f\n", sonar_val_in);
 
     x_out = ceil(r * cosf(pitch) * sinf((yaw*(PI/180))));
     y_out = ceil(r * cosf(pitch) * cosf((yaw*(PI/180))));
@@ -180,6 +184,37 @@ int main(int argc, char *argv[]){
     printf("Xout: %d Yout: %d Zout: %d\n", x_out, y_out, z_out);
     usleep(5000);
   }
+}
+
+void extraction_uart(float *destination){
+  int sonar_in;
+  int j = 0;
+  int first_e_found = 0;
+  char *buf;
+  char *temp_buf;
+  float dest;
+  buf = (char *)malloc(sonar_size);
+  temp_buf = (char *)malloc(10);
+
+  sonar_in = read(uart_file, buf, sizeof buf);
+  printf("Sonar_in: %d\n", sonar_in);
+  printf("Buff obtained: %s\n", buf);
+  for(int i = 0; i < strlen(buf); i++){
+    if(buf[i] == 's'){
+      while(buf[i] != 'e'){
+        i++;
+        j++;
+        first_e_found = 1;
+        temp_buf[j] = buf[i];
+      }
+    }
+    if(first_e_found == 1){
+      break;
+    }
+  }
+  dest = atof(temp_buf);
+  printf("Dest: %f\n", dest);
+  *destination = atof(temp_buf);
 }
 
 void initialize_mpu(){
