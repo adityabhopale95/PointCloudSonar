@@ -12,7 +12,7 @@
 #include <string.h>
 
 void initialize_uart(){
-  char *port_name = "/dev/ttyUSB1";
+  char *port_name = "/dev/ttyUSB0";
   uart_file = open(port_name, O_RDWR | O_NOCTTY);
   printf("UART FILE: %d\n", uart_file);
   if(uart_file < 0){
@@ -20,7 +20,7 @@ void initialize_uart(){
     exit(1);
   }
 
-  set_serial_attr(B4800,0);
+  set_serial_attr(B19200,0);
   set_serial_blocking(0);
 }
 
@@ -107,8 +107,8 @@ int main(int argc, char *argv[]){
   int16_t gyro_count[3];
   address = DEV_ADD;
   FILE *fp_wr;
-  char *fp_name = "a";
-  int16_t x_out,y_out,z_out;
+  char *fp_name = "co_ords";
+  float x_out,y_out,z_out;
   float sonar_val;
 
   //fp_name = strcat(fp_name,".csv");
@@ -133,7 +133,7 @@ int main(int argc, char *argv[]){
       gyro_y = (float)(gyro_count[1]) * Gres;
       gyro_z = (float)(gyro_count[2]) * Gres;
 
-      initialize_i2c(MAG_ASTC);
+      /*initialize_i2c(MAG_ASTC);
       read_data_mag(mag_count);
       mag_bias[0] =+ 470.0;
       mag_bias[1] =+ 120.0;
@@ -141,7 +141,7 @@ int main(int argc, char *argv[]){
 
       mag_x = (float(mag_count[0]) * Mres * mag_Calib[0]) - mag_bias[0];
       mag_y = (float(mag_count[1]) * Mres * mag_Calib[1]) - mag_bias[1];
-      mag_z = (float(mag_count[2]) * Mres * mag_Calib[2]) - mag_bias[2];
+      mag_z = (float(mag_count[2]) * Mres * mag_Calib[2]) - mag_bias[2];*/
     }
 
     MadgwickAHRSupdateIMUOpt((gyro_x*(PI/180)), (gyro_y*(PI/180)), (gyro_z*(PI/180)), accel_x, accel_y, accel_z);
@@ -149,10 +149,10 @@ int main(int argc, char *argv[]){
     toEulerAngle(q0, q1, q2, q3);
 
     if(yaw < 0.0){
-      yaw = yaw + (360.0f/6.0f);
+      yaw = yaw + (360.0f/2.5f);
     }
 
-    yaw = yaw * 6.0f;
+    yaw = yaw * 2.5f;
 
     if(yaw > 360.0){
       yaw = yaw - 360.0;
@@ -160,28 +160,26 @@ int main(int argc, char *argv[]){
 
     extraction_uart(&sonar_val);
 
-
-//    sonar_val_in = atof(buf);
-
     printf("Buff: %f\n", sonar_val);
-//    printf("Sonar values: %f\n", sonar_val_in);
 
-    x_out = ceil(r * cosf(pitch) * sinf((yaw*(PI/180))));
-    y_out = ceil(r * cosf(pitch) * cosf((yaw*(PI/180))));
-    z_out = ceil(r * sinf(pitch));
+    if(sonar_val < 300.0){
+    	x_out = ceil(sonar_val * cosf(pitch) * sinf((yaw*(PI/180))));
+    	y_out = ceil(sonar_val * cosf(pitch) * cosf((yaw*(PI/180))));
+    	z_out = ceil(sonar_val * sinf(pitch));
+    }
 
-    fp_wr = fopen(fp_name,"a");
-
-    fprintf(fp_wr, "%d,%d,%d\n", x_out, y_out, z_out);
-
-    fclose(fp_wr);
+    if((x_out < 150.0) && (y_out < 150.0) && (z_out < 150.0)){
+       fp_wr = fopen(fp_name,"a");
+       fprintf(fp_wr, "%d,%d,%d\n", (int)(x_out), (int)y_out, (int)z_out);
+       fclose(fp_wr);
+    }
 
     printf("accel_x: %f accel_y: %f accel_z: %f\n", accel_x, accel_y, accel_z);
     printf("gyro_x: %f gyro_y: %f gyro_z: %f\n", gyro_x, gyro_y, gyro_z);
-    printf("mag_x: %f mag_y: %f mag_z: %f\n", mag_x, mag_y, mag_z);
+//    printf("mag_x: %f mag_y: %f mag_z: %f\n", mag_x, mag_y, mag_z);
     printf("q0: %f, q1: %f,q2: %f,q3: %f\n", q0,q1,q2,q3);
     printf("roll: %f pitch: %f yaw: %f\n\n", (roll*(180.0/PI)), (pitch*(180.0/PI)), (yaw));
-    printf("Xout: %d Yout: %d Zout: %d\n", x_out, y_out, z_out);
+    printf("Xout: %f Yout: %f Zout: %f\n", x_out, y_out, z_out);
     usleep(5000);
   }
 }
@@ -196,24 +194,30 @@ void extraction_uart(float *destination){
   buf = (char *)malloc(sonar_size);
   temp_buf = (char *)malloc(10);
 
-  sonar_in = read(uart_file, buf, sizeof buf);
-  printf("Sonar_in: %d\n", sonar_in);
-  printf("Buff obtained: %s\n", buf);
+  sonar_in = read(uart_file, buf, sonar_size);
+//  printf("Sonar_in: %d\n", sonar_in);
+//  printf("Buff obtained: %s\n", buf);
   for(int i = 0; i < strlen(buf); i++){
     if(buf[i] == 's'){
       while(buf[i] != 'e'){
         i++;
-        j++;
+        if(i == strlen(buf)){
+          first_e_found = 1;
+          break;
+        }
         first_e_found = 1;
         temp_buf[j] = buf[i];
+        j++;
       }
     }
     if(first_e_found == 1){
       break;
     }
   }
+
+//  printf("temp_buf: %s\n", temp_buf);
   dest = atof(temp_buf);
-  printf("Dest: %f\n", dest);
+//  printf("Dest: %f\n", dest);
   *destination = atof(temp_buf);
 }
 

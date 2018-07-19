@@ -61,7 +61,7 @@
 #define sampleFreq	100.0f		// sample frequency in Hz
 #define betaDef	1.5f		// 2 * proportional gain
 
-#define sonar_size 30
+#define sonar_size 15
 
 int i2c_file;
 int uart_file;
